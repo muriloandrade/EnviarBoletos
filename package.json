@@ -1,0 +1,25 @@
+{
+  "name": "FiocomTeste",
+  "version": "1.0.0",
+  "main": "index.js",
+  "license": "MIT",
+  "dependencies": {
+    "cli-progress": "^3.9.0",
+    "csv-parse": "^4.16.0",
+    "csvtojson": "^2.0.10",
+    "dotenv": "^10.0.0",
+    "md5-file": "^5.0.0",
+    "nodemailer": "^6.6.2",
+    "pdf.js-extract": "^0.1.5",
+    "prompt": "^1.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^16.0.0",
+    "@types/nodemailer": "^6.4.2",
+    "ts-node-dev": "^1.1.8",
+    "typescript": "^4.3.5"
+  },
+  "scripts": {
+    "dev": "ts-node-dev ./index.ts"
+  }
+}
