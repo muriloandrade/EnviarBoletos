@@ -11,7 +11,7 @@ const csv = require("csvtojson");
 const md5File = require("md5-file");
 const readline = require("readline");
 const CNPJ_FIOCOM = "48.263.115/0001-03";
-const CSV_FILE = "./list.csv";
+const CSV_FILE = "./clientes-teste.csv";
 const HASHES_FILE = "./hashes.txt";
 const PASTA_BOLETOS = "./Boletos/";
 const PASTA_ENVIADOS = "./Enviados/";
@@ -32,6 +32,7 @@ class Envio {
 }
 
 class Cliente {
+  nome: string;
   id: string;
   emails: string[];
 }
@@ -123,19 +124,14 @@ async function sendEmail(envio: Envio) {
     },
   });
 
-  const fileSubstring = envio.arquivoNome.substring(
-    7,
-    envio.arquivoNome.indexOf(".pdf")
-  );
-
   let sent = false;
   try {
     var mailOptions = {
       name: process.env.NAME,
       from: process.env.FROM,
       to: envio.cliente.emails,
-      bcc: process.env.FROM,
-      subject: `${process.env.SUBJECT} - ${fileSubstring}`,
+      //bcc: process.env.FROM,
+      subject: `${process.env.SUBJECT} - ${envio.cliente.nome}`,
       html: await readFile(process.env.HTML_FILE, "utf8"),
       dsn: {
         id: envio.arquivoHash,
@@ -144,8 +140,8 @@ async function sendEmail(envio: Envio) {
         recipient: process.env.FROM,
       },
       headers: {
-        "Return-Receipt-To": `<${process.env.FROM}>`,
-        "Disposition-Notification-To": `<${process.env.FROM}>`,
+        "Return-Receipt-To": `${process.env.FROM}`,
+        "Disposition-Notification-To": `${process.env.FROM}`,
       },
       attachments: [
         {
@@ -158,7 +154,6 @@ async function sendEmail(envio: Envio) {
     log(`----> Tentando enviar: ${JSON.stringify(envio)}`);
     const resposta = await transporter.sendMail(mailOptions);
     sent = true;
-    console.log(envio.arquivoNome + " - OK");
     log("Resposta do envio: " + JSON.stringify(resposta));
     log(`E-mail enviado! Adicionando a 'itensEnviados'`);
     itensEnviados.push(envio);
@@ -347,7 +342,7 @@ async function doit() {
           const rl = readline.createInterface({
             input: process.stdin,
             output: process.stdout,
-          });          
+          });
           console.log(`Reenviar "${envio.arquivoNome} ?`);
           process.stdout.write("> ");
           for await (const resp of rl) {
@@ -368,7 +363,7 @@ async function doit() {
                 "A resposta deve ser S (sim), N (não) ou NT (não p/ todos os próximos)"
               );
             }
-            console.log()
+            console.log();
             rl.close();
           }
         }
@@ -376,71 +371,83 @@ async function doit() {
     }
 
     // ROTINA PARA ENVIO DOS E-MAILS
-    log("Inicio da rotina para envio dos e-mails");
-    console.log("Enviando e-mails...");
+    if (envios.length == 0) {
+      console.log()
+      log("Nada a ser enviado - verifique se há arquivos na pasta " + PASTA_BOLETOS);
+      console.log("Nada a ser enviado - verifique se há arquivos na pasta " + PASTA_BOLETOS);
+    } else {
+      log("Inicio da rotina para envio dos e-mails. Total a ser enviado: " + envios.length);
+      console.log()
+      console.log(`Total: ${envios.length} e-mails a serem enviados:`);
 
-    log("Iteracao de 'envios'");
-    for (const envio of envios) {
-      log("Iterando novo 'envio'");
-      try {
-        await sendEmail(envio);
-      } catch (error) {
-        log(`Erro: ${error.message}`);
+      log("Iteracao de 'envios'");
+      for (const envio of envios) {
+        log("Iterando novo 'envio'");
+        try {
+          process.stdout.write(`\nEnviando ${envio.arquivoNome}... `);
+          await sendEmail(envio);
+          process.stdout.write(`OK`);
+        } catch (error) {
+          log(`Erro: ${error.message}`);
+        }
       }
-    }
-
-    jaEnviados = undefinedsRemoved(jaEnviados);
-
-    log("Escrevendo o report");
-    log("itensEnviados: " + itensEnviados.length);
-    log("itensNaoEnviados: " + itensNaoEnviados.length);
-    log("jaEnviados: " + jaEnviados.length);
-    log("enviosSemClienteCadastrado: " + clientesNaoCadastrados.length);
-    log("arquivosSemIdDoCliente: " + arquivosSemIdDoCliente.length);
-
-    if (itensEnviados.length != 0) {
       console.log();
-      log(`E-MAIL(S) ENVIADO(S) COM SUCESSO: ${itensEnviados.length}`);
-      console.log(`E-MAIL(S) ENVIADO(S) COM SUCESSO: ${itensEnviados.length}`);
-      itensEnviados.forEach((item) => {
-        console.log("OK - " + item.arquivoNome);
-      });
-    }
-    if (
-      itensNaoEnviados.length != 0 ||
-      jaEnviados.length != 0 ||
-      arquivosSemIdDoCliente.length != 0 ||
-      clientesNaoCadastrados.length != 0
-    ) {
-      console.log();
-      const totalNaoEnviados =
-        itensNaoEnviados.length +
-        jaEnviados.length +
-        arquivosSemIdDoCliente.length +
-        clientesNaoCadastrados.length;
-      log("E-MAIL(S) NÃO ENVIADO(S): " + totalNaoEnviados);
-      console.log(`E-MAIL(S) NÃO ENVIADO(S): ${totalNaoEnviados}`);
-      itensNaoEnviados.forEach((envio: Envio) => {
-        console.log("X - " + envio.arquivoNome);
-      });
-      jaEnviados.forEach(async (envio) => {
-        log("X - " + envio.arquivoNome + " (motivo: já enviado)");
-        console.log("X - " + envio.arquivoNome + " (motivo: já enviado)");
-      });
-      clientesNaoCadastrados.forEach(async (envio) => {
-        log(
-          `X - ${envio.arquivoNome} (motivo: cliente ${envio.cliente.id} não cadastrado)`
-        );
+
+      jaEnviados = undefinedsRemoved(jaEnviados);
+
+      log("Escrevendo o report");
+      log("itensEnviados: " + itensEnviados.length);
+      log("itensNaoEnviados: " + itensNaoEnviados.length);
+      log("jaEnviados: " + jaEnviados.length);
+      log("enviosSemClienteCadastrado: " + clientesNaoCadastrados.length);
+      log("arquivosSemIdDoCliente: " + arquivosSemIdDoCliente.length);
+
+      if (itensEnviados.length != 0) {
+        console.log();
+        log(`E-MAIL(S) ENVIADO(S) COM SUCESSO: ${itensEnviados.length}`);
         console.log(
-          `X - ${envio.arquivoNome} (motivo: cliente ${envio.cliente.id} não cadastrado)`
+          `E-MAIL(S) ENVIADO(S) COM SUCESSO: ${itensEnviados.length}`
         );
-      });
-      arquivosSemIdDoCliente.forEach(async (envio) => {
-        log("X - " + envio.arquivoNome + " (motivo: arquivo sem CPF/CNPJ)");
-        console.log(
-          "X - " + envio.arquivoNome + " (motivo: arquivo sem CPF/CNPJ)"
-        );
-      });
+        itensEnviados.forEach((item) => {
+          console.log("OK - " + item.arquivoNome);
+        });
+      }
+      if (
+        itensNaoEnviados.length != 0 ||
+        jaEnviados.length != 0 ||
+        arquivosSemIdDoCliente.length != 0 ||
+        clientesNaoCadastrados.length != 0
+      ) {
+        console.log();
+        const totalNaoEnviados =
+          itensNaoEnviados.length +
+          jaEnviados.length +
+          arquivosSemIdDoCliente.length +
+          clientesNaoCadastrados.length;
+        log("E-MAIL(S) NÃO ENVIADO(S): " + totalNaoEnviados);
+        console.log(`E-MAIL(S) NÃO ENVIADO(S): ${totalNaoEnviados}`);
+        itensNaoEnviados.forEach((envio: Envio) => {
+          console.log("X - " + envio.arquivoNome);
+        });
+        jaEnviados.forEach(async (envio) => {
+          log("X - " + envio.arquivoNome + " (motivo: já enviado)");
+          console.log("X - " + envio.arquivoNome + " (motivo: já enviado)");
+        });
+        clientesNaoCadastrados.forEach(async (envio) => {
+          log(
+            `X - ${envio.arquivoNome} (motivo: cliente ${envio.cliente.id} não cadastrado)`
+          );
+          console.log(
+            `X - ${envio.arquivoNome} (motivo: cliente ${envio.cliente.id} não cadastrado)`
+          );
+        });
+        arquivosSemIdDoCliente.forEach(async (envio) => {
+          log("X - " + envio.arquivoNome + " (motivo: arquivo sem CPF/CNPJ)");
+          console.log(
+            "X - " + envio.arquivoNome + " (motivo: arquivo sem CPF/CNPJ)"
+          );
+        });
+      }
     }
   } catch (error) {
     console.log();
@@ -451,6 +458,7 @@ async function doit() {
   }
 
   await log("**** FINALIZANDO ****");
+  console.log();
   console.log("Finalizando...");
   console.log();
   process.exit();

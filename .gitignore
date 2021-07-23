@@ -2,5 +2,9 @@
 /node_modules
 
 # misc
-.env.local
+.env
 model.html
+clientes*
+/tmp
+/Boletos
+/Enviados
