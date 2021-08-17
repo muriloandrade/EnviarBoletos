@@ -29,6 +29,7 @@ class Envio {
   arquivoNome: string;
   arquivoHash: string;
   cliente: Cliente = new Cliente();
+  notaFiscal: string;
 }
 
 class Cliente {
@@ -52,8 +53,9 @@ async function readCSV(csvFile) {
   return clientes;
 }
 
-async function getIdFromPDF(file) {
+async function getDataFromPDF(file) {
   let id;
+  let notaFiscal = "0";
   const idRegex =
     /([0-9]{2}[\.][0-9]{3}[\.][0-9]{3}[\/][0-9]{4}[\-][0-9]{2})|([0-9]{3}[\.][0-9]{3}[\.][0-9]{3}[\-][0-9]{2})/;
 
@@ -66,13 +68,18 @@ async function getIdFromPDF(file) {
       if (idRegex.test(item.str)) {
         if (!item.str.match(CNPJ_FIOCOM)) id = item.str;
       }
+      if (notaFiscal == "0000" && !isNaN(item.str as any))
+        notaFiscal = item.str;
+
+      // Setar 0000 significa que o proximo item sera o numero da NF
+      if (item.str == "Núm. do documento") notaFiscal = "0000";
     });
   } catch (error) {
     log("Erro ao ler os dados do arquivo " + file + " - " + error.message);
     error.message = "Erro na leitura do arquivo " + file;
     throw error;
   }
-  return id;
+  return [id, notaFiscal];
 }
 
 function getClienteById(clientes: Cliente[], id: string) {
@@ -131,7 +138,7 @@ async function sendEmail(envio: Envio) {
       from: process.env.FROM,
       to: envio.cliente.emails,
       //bcc: process.env.FROM,
-      subject: `${process.env.SUBJECT} - ${envio.cliente.nome}`,
+      subject: `${process.env.SUBJECT} - ${envio.cliente.nome} - NF: ${envio.notaFiscal}`,
       html: await readFile(process.env.HTML_FILE, "utf8"),
       dsn: {
         id: envio.arquivoHash,
@@ -216,53 +223,12 @@ async function reduzLinhasArquivo(file_path, max_linhas) {
   }
 }
 
-async function obterEmailsManualmente(envio: Envio) {
-  const emailsRegex = /^([\w+-.%]+@[\w-.]+\.[A-Za-z]{2,4} ?)+$/;
-  let resposta = "";
-  let continua = true;
-  while (!emailsRegex.test(resposta) && continua) {
-    const rl = readline.createInterface({
-      input: process.stdin,
-      output: process.stdout,
-    });
-    console.log();
-    console.log(`E-mail(s) de ${envio.cliente.id}: `);
-    process.stdout.write("> ");
-    for await (const resp of rl) {
-      resposta = resp.toLowerCase();
-      if (emailsRegex.test(resposta)) {
-        envio.cliente.emails = resposta.split(" ");
-      } else if (resposta == "n") {
-        continua = false;
-      } else {
-        console.log(
-          "Entrada inválida: verifique o formato do(s) e-mail(s) informado(s)"
-        );
-        console.log();
-      }
-      rl.close();
-    }
-  }
-  return envio.cliente.emails;
-}
-
-async function cadastraCliente(file, envio: Envio) {
-  const line = `\n${envio.cliente.id}, ${envio.cliente.emails.join(", ")}`;
-  try {
-    await fs.promises.appendFile(file, line);
-  } catch (error) {
-    log(`Erro ao cadastrar cliente no arquivo ${file} - ${error.message}`);
-    error.message = `Erro ao cadastrar cliente no arquivo ${file}`;
-    throw error;
-  }
-}
-
 function undefinedsRemoved(array) {
   var filtered = array.filter(Boolean);
   return filtered;
 }
 
-async function doit() {
+(async function () {
   try {
     log("**** INICIANDO ****");
 
@@ -286,8 +252,12 @@ async function doit() {
       envio.arquivoNome = file;
       envio.arquivoHash = md5File.sync(`${PASTA_BOLETOS}${file}`);
 
-      // Obtem o CPF/CNPJ contido no PDF
-      envio.cliente.id = await getIdFromPDF(`${PASTA_BOLETOS}${file}`);
+      // Obtem o CPF/CNPJ e NotaFiscal contidos no PDF
+      const [clientId, notaFiscal] = await getDataFromPDF(
+        `${PASTA_BOLETOS}${file}`
+      );
+      envio.cliente.id = clientId;
+      envio.notaFiscal = notaFiscal;
       if (!envio.cliente.id) {
         log(`O arquivo ${file} não contém CPF/CNPJ`);
         arquivosSemIdDoCliente.push(envio);
@@ -372,12 +342,21 @@ async function doit() {
 
     // ROTINA PARA ENVIO DOS E-MAILS
     if (envios.length == 0) {
-      console.log()
-      log("Nada a ser enviado - verifique se há arquivos na pasta " + PASTA_BOLETOS);
-      console.log("Nada a ser enviado - verifique se há arquivos na pasta " + PASTA_BOLETOS);
+      console.log();
+      log(
+        "Nada a ser enviado - verifique se há arquivos na pasta " +
+          PASTA_BOLETOS
+      );
+      console.log(
+        "Nada a ser enviado - verifique se há arquivos na pasta " +
+          PASTA_BOLETOS
+      );
     } else {
-      log("Inicio da rotina para envio dos e-mails. Total a ser enviado: " + envios.length);
-      console.log()
+      log(
+        "Inicio da rotina para envio dos e-mails. Total a ser enviado: " +
+          envios.length
+      );
+      console.log();
       console.log(`Total: ${envios.length} e-mails a serem enviados:`);
 
       log("Iteracao de 'envios'");
@@ -462,6 +441,4 @@ async function doit() {
   console.log("Finalizando...");
   console.log();
   process.exit();
-}
-
-doit();
+})();
