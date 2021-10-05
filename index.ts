@@ -68,8 +68,15 @@ async function getDataFromPDF(file) {
       if (idRegex.test(item.str)) {
         if (!item.str.match(CNPJ_FIOCOM)) id = item.str;
       }
-      if (notaFiscal == "0000" && !isNaN(item.str as any))
-        notaFiscal = item.str;
+      if (notaFiscal == "0000") {
+        // Possiveis valores: 12345, 12345/1, 12345/2, etc
+        // Confirma que o valor encontrado eh um numero
+        if (
+          !isNaN(item.str as any) ||
+          !isNaN(item.str.substring(0, item.str.indexOf("/")) as any)
+        )
+          notaFiscal = item.str;
+      }
 
       // Setar 0000 significa que o proximo item sera o numero da NF
       if (item.str == "Núm. do documento") notaFiscal = "0000";
@@ -167,9 +174,9 @@ async function sendEmail(envio: Envio) {
     log("Movendo para pasta 'Enviados'");
     const oldPath = `${PASTA_BOLETOS}${envio.arquivoNome}`;
     const newPath = `${PASTA_ENVIADOS}${envio.arquivoNome}`;
-    await fs.promises.rename(oldPath, newPath);
     log(`Escrevendo o hash ${envio.arquivoHash} em 'hashes.txt'`);
     await fs.promises.appendFile(HASHES_FILE, envio.arquivoHash + "\n");
+    await fs.promises.rename(oldPath, newPath);
   } catch (error) {
     log("Erro ao tentar enviar e-mail - " + error.message);
     if (!sent) {

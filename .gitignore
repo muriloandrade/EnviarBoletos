@@ -4,6 +4,8 @@
 # misc
 .env
 model.html
+log.txt
+hashes.txt
 clientes*
 /tmp
 /Boletos
