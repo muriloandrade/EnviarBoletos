@@ -173,7 +173,19 @@ async function sendEmail(envio: Envio) {
     itensEnviados.push(envio);
     log("Movendo para pasta 'Enviados'");
     const oldPath = `${PASTA_BOLETOS}${envio.arquivoNome}`;
-    const newPath = `${PASTA_ENVIADOS}${envio.arquivoNome}`;
+
+    let today = new Date();
+    let date = today.toLocaleDateString('pt-BR')
+    date = date.substring(6, 10) + '-' + date.substring(3, 5) + '-' + date.substring(0, 2);
+
+    const newPathFolder = `${PASTA_ENVIADOS}${date}`;
+    if (!fs.existsSync(newPathFolder)) {
+      fs.mkdirSync(newPathFolder, {
+        recursive: true
+      });
+    }
+    const newPath = `${newPathFolder}/${envio.arquivoNome}`;
+
     log(`Escrevendo o hash ${envio.arquivoHash} em 'hashes.txt'`);
     await fs.promises.appendFile(HASHES_FILE, envio.arquivoHash + "\n");
     await fs.promises.rename(oldPath, newPath);
