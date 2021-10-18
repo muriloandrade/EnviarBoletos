@@ -70,12 +70,10 @@ async function getDataFromPDF(file) {
       }
       if (notaFiscal == "0000") {
         // Possiveis valores: 12345, 12345/1, 12345/2, etc
+        if (item.str.indexOf("/") > 0)
+          item.str = item.str.substring(0, item.str.indexOf("/"));
         // Confirma que o valor encontrado eh um numero
-        if (
-          !isNaN(item.str as any) ||
-          !isNaN(item.str.substring(0, item.str.indexOf("/")) as any)
-        )
-          notaFiscal = item.str;
+        if (!isNaN(item.str as any)) notaFiscal = item.str;
       }
 
       // Setar 0000 significa que o proximo item sera o numero da NF
