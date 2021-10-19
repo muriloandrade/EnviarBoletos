@@ -64,6 +64,8 @@ async function getDataFromPDF(file) {
     const data = await pdfExtract.extract(file);
     const page = data.pages[0].content;
 
+    log(JSON.stringify(page));
+
     page.forEach((item) => {
       if (idRegex.test(item.str)) {
         if (!item.str.match(CNPJ_FIOCOM)) id = item.str;
@@ -77,7 +79,7 @@ async function getDataFromPDF(file) {
       }
 
       // Setar 0000 significa que o proximo item sera o numero da NF
-      if (item.str == "Núm. do documento") notaFiscal = "0000";
+      if (item.str.includes("Núm. do documento")) notaFiscal = "0000";
     });
   } catch (error) {
     log("Erro ao ler os dados do arquivo " + file + " - " + error.message);
