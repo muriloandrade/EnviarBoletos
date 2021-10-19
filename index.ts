@@ -191,6 +191,7 @@ async function sendEmail(envio: Envio) {
     await fs.promises.rename(oldPath, newPath);
   } catch (error) {
     log("Erro ao tentar enviar e-mail - " + error.message);
+    if(error.message.contains("ECONNREFUSED")) sleep(5000);
     if (!sent) {
       log("E-mail nao enviado. Adicionando a 'itensNaoEnviados'");
       itensNaoEnviados.push(envio);
@@ -245,6 +246,14 @@ async function reduzLinhasArquivo(file_path, max_linhas) {
 function undefinedsRemoved(array) {
   var filtered = array.filter(Boolean);
   return filtered;
+}
+
+function sleep(milliseconds) {
+  const date = Date.now();
+  let currentDate = null;
+  do {
+    currentDate = Date.now();
+  } while (currentDate - date < milliseconds);
 }
 
 (async function () {
